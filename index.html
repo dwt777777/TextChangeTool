@@ -249,7 +249,7 @@
     <h2>累积结果</h2>
     <span id="historyCount" class="count-badge"></span>
   </div>
-  <textarea id="historyOutput" readonly placeholder='每次转换的结果会累积成数组，例如 ["A","B"]'></textarea>
+  <textarea id="historyOutput" readonly placeholder='每次转换的结果会累积起来，例如 {"A","B"}'></textarea>
   <div class="row">
     <button id="historyCopyBtn" class="btn-outline" type="button">复制全部结果</button>
     <button id="historyUndoBtn" class="btn-warn" type="button">删除上一条</button>
@@ -285,7 +285,9 @@
   }
 
   function renderHistory() {
-    historyOutput.value = resultHistory.length ? JSON.stringify(resultHistory) : '';
+    historyOutput.value = resultHistory.length
+      ? '{' + resultHistory.map((v) => JSON.stringify(v)).join(',') + '}'
+      : '';
     historyCount.textContent = resultHistory.length ? ('共 ' + resultHistory.length + ' 条') : '';
   }
   renderHistory();
