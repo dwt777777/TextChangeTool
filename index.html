@@ -35,15 +35,37 @@
     box-shadow: 0 1px 4px rgba(0,0,0,0.08);
     margin-bottom: 22px;
   }
-  .card h2 {
-    font-size: 1.1rem;
+  .card-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     margin: 0 0 14px;
+    cursor: default;
   }
-  label {
-    display: block;
-    font-weight: 600;
-    margin-bottom: 8px;
-    font-size: 1rem;
+  .card-head h2 {
+    font-size: 1.1rem;
+    margin: 0;
+  }
+  .step-badge {
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #2563eb;
+    color: #fff;
+    font-size: 0.95rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .count-badge {
+    font-size: 0.85rem;
+    color: #888;
+    font-weight: 500;
+  }
+  textarea, input[type="text"] {
+    transition: box-shadow .2s ease, border-color .2s ease;
   }
   textarea {
     width: 100%;
@@ -54,6 +76,14 @@
     font-size: 1.05rem;
     font-family: inherit;
     resize: vertical;
+  }
+  textarea[readonly] {
+    background: #f8f9fb;
+    color: #333;
+  }
+  textarea.flash {
+    border-color: #16a34a;
+    box-shadow: 0 0 0 3px rgba(22,163,74,0.15);
   }
   input[type="text"] {
     width: 100%;
@@ -89,42 +119,61 @@
     background: #16a34a;
   }
   .add-row-btn:disabled {
-    background: #ccc;
+    background: #ddd;
+    color: #999;
+    border-color: #ddd;
     cursor: not-allowed;
   }
   .row {
     display: flex;
+    align-items: center;
     gap: 12px;
     margin-top: 16px;
     flex-wrap: wrap;
   }
+  .hint {
+    font-size: 0.88rem;
+    color: #999;
+    margin: 10px 0 0;
+  }
   button {
     background: #2563eb;
     color: #fff;
-    border: none;
+    border: 1.5px solid transparent;
     padding: 14px 24px;
     border-radius: 8px;
     font-size: 1.05rem;
+    font-weight: 500;
     cursor: pointer;
     min-height: 48px;
   }
-  button.secondary {
-    background: #e5e7eb;
-    color: #222;
+  button.btn-outline {
+    background: #fff;
+    color: #2563eb;
+    border-color: #2563eb;
+  }
+  button.btn-warn {
+    background: #fff;
+    color: #b45309;
+    border-color: #f59e0b;
+  }
+  button.btn-danger {
+    background: #fff;
+    color: #dc2626;
+    border-color: #dc2626;
   }
   button:disabled {
-    background: #ccc;
-    color: #888;
+    background: #eee;
+    color: #aaa;
+    border-color: #eee;
     cursor: not-allowed;
   }
   button:active:not(:disabled) {
-    opacity: 0.85;
+    opacity: 0.8;
   }
   #copyHint, #historyCopyHint {
     font-size: 0.95rem;
     color: #16a34a;
-    margin-left: 8px;
-    align-self: center;
     visibility: hidden;
   }
   footer {
@@ -141,45 +190,71 @@
   footer strong {
     color: #333;
   }
+  @media (max-width: 480px) {
+    .row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .row button {
+      width: 100%;
+    }
+    #copyHint, #historyCopyHint {
+      text-align: center;
+    }
+  }
 </style>
 </head>
 <body>
 
 <h1>文本转换工具</h1>
-<p class="desc">输入正文，再填写商品名（必填）和金额（选填），点击"转换"即可在正文前拼接上商品信息。所有处理都在你的浏览器里完成，不会上传到任何服务器。</p>
+<p class="desc">按下面四步操作：填正文 → 填商品信息 → 转换 → 结果自动累积。所有处理都在你的浏览器里完成，不会上传到任何服务器。</p>
 
 <div class="card">
-  <label for="inputText">正文内容</label>
+  <label class="card-head" for="inputText">
+    <span class="step-badge">1</span>
+    <h2 style="display:inline; margin:0;">正文内容</h2>
+  </label>
   <textarea id="inputText" placeholder="在这里粘贴或输入正文..."></textarea>
 </div>
 
 <div class="card">
-  <h2>商品信息</h2>
+  <div class="card-head">
+    <span class="step-badge">2</span>
+    <h2>商品信息</h2>
+  </div>
   <div id="productRows"></div>
 
   <div class="row">
     <button id="convertBtn" disabled>转换</button>
-    <button id="clearBtn" class="secondary" type="button">清空</button>
+    <button id="clearBtn" class="btn-danger" type="button">全部清空</button>
+  </div>
+  <p id="convertHint" class="hint">先填写至少一个商品名，转换按钮才会启用</p>
+</div>
+
+<div class="card">
+  <label class="card-head" for="outputText">
+    <span class="step-badge">3</span>
+    <h2 style="display:inline; margin:0;">转换结果</h2>
+  </label>
+  <textarea id="outputText" readonly placeholder="点击“转换”后，结果会显示在这里"></textarea>
+  <div class="row">
+    <button id="copyBtn" class="btn-outline" type="button">复制本次结果</button>
+    <span id="copyHint">✓ 已复制</span>
   </div>
 </div>
 
 <div class="card">
-  <label for="outputText">转换结果</label>
-  <textarea id="outputText" readonly placeholder="转换后的结果会显示在这里"></textarea>
-  <div class="row">
-    <button id="copyBtn" class="secondary" type="button">复制结果</button>
-    <span id="copyHint">已复制</span>
+  <div class="card-head">
+    <span class="step-badge">4</span>
+    <h2>累积结果</h2>
+    <span id="historyCount" class="count-badge"></span>
   </div>
-</div>
-
-<div class="card">
-  <label for="historyOutput">累积结果</label>
-  <textarea id="historyOutput" readonly placeholder="[]"></textarea>
+  <textarea id="historyOutput" readonly placeholder='每次转换的结果会累积成数组，例如 ["A","B"]'></textarea>
   <div class="row">
-    <button id="historyCopyBtn" class="secondary" type="button">复制结果</button>
-    <button id="historyUndoBtn" class="secondary" type="button">删除上一条</button>
-    <button id="historyClearBtn" class="secondary" type="button">清空</button>
-    <span id="historyCopyHint">已复制</span>
+    <button id="historyCopyBtn" class="btn-outline" type="button">复制全部结果</button>
+    <button id="historyUndoBtn" class="btn-warn" type="button">删除上一条</button>
+    <button id="historyClearBtn" class="btn-danger" type="button">清空全部</button>
+    <span id="historyCopyHint">✓ 已复制</span>
   </div>
 </div>
 
@@ -195,12 +270,23 @@
   const inputText = document.getElementById('inputText');
   const outputText = document.getElementById('outputText');
   const convertBtn = document.getElementById('convertBtn');
+  const convertHint = document.getElementById('convertHint');
   const historyOutput = document.getElementById('historyOutput');
+  const historyCount = document.getElementById('historyCount');
 
   let resultHistory = [];
 
+  function flash(el) {
+    el.classList.remove('flash');
+    void el.offsetWidth;
+    el.classList.add('flash');
+    clearTimeout(el._flashTimer);
+    el._flashTimer = setTimeout(() => el.classList.remove('flash'), 700);
+  }
+
   function renderHistory() {
-    historyOutput.value = JSON.stringify(resultHistory);
+    historyOutput.value = resultHistory.length ? JSON.stringify(resultHistory) : '';
+    historyCount.textContent = resultHistory.length ? ('共 ' + resultHistory.length + ' 条') : '';
   }
   renderHistory();
 
@@ -233,6 +319,7 @@
 
     const hasAnyName = names.some((v) => v);
     convertBtn.disabled = !hasAnyName;
+    convertHint.style.display = hasAnyName ? 'none' : 'block';
   }
 
   productRows.addEventListener('input', updateState);
@@ -250,9 +337,11 @@
     });
     const prefix = groups.length ? '[' + groups.join('/') + ']' : '';
     outputText.value = prefix + inputText.value;
+    flash(outputText);
 
     resultHistory.push(outputText.value);
     renderHistory();
+    flash(historyOutput);
   });
 
   document.getElementById('clearBtn').addEventListener('click', () => {
