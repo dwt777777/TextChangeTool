@@ -272,8 +272,8 @@
 <footer>
   <p style="margin: 0 0 6px;"><strong>转换规则说明</strong></p>
   <p style="margin: 0 0 4px;">在正文前面加上「[ ]」，里面放商品信息，格式为「商品名=金额」；金额留空时不加 = 符号，只显示商品名。</p>
-  <p style="margin: 0 0 4px;">填了多组商品名和金额，用「/」把它们隔开。</p>
-  <p style="margin: 4px 0 0;">例如：[商品名=343424/商品名2]正文内容</p>
+  <p style="margin: 0 0 4px;">填了多组商品名和金额，用「,」（半角逗号）把它们隔开。</p>
+  <p style="margin: 4px 0 0;">例如：[商品名=343424,商品名2]正文内容</p>
 </footer>
 
 <script>
@@ -362,7 +362,7 @@
       const amount = row.querySelector('.product-amount').value.trim();
       groups.push(amount ? name + '=' + amount : name);
     });
-    const prefix = groups.length ? '[' + groups.join('/') + ']' : '';
+    const prefix = groups.length ? '[' + groups.join(',') + ']' : '';
     outputText.value = prefix + inputText.value;
     flash(outputText);
 
