@@ -120,7 +120,7 @@
   button:active:not(:disabled) {
     opacity: 0.85;
   }
-  #copyHint {
+  #copyHint, #historyCopyHint {
     font-size: 0.95rem;
     color: #16a34a;
     margin-left: 8px;
@@ -172,6 +172,17 @@
   </div>
 </div>
 
+<div class="card">
+  <label for="historyOutput">累积结果</label>
+  <textarea id="historyOutput" readonly placeholder="[]"></textarea>
+  <div class="row">
+    <button id="historyCopyBtn" class="secondary" type="button">复制结果</button>
+    <button id="historyUndoBtn" class="secondary" type="button">删除上一条</button>
+    <button id="historyClearBtn" class="secondary" type="button">清空</button>
+    <span id="historyCopyHint">已复制</span>
+  </div>
+</div>
+
 <footer>
   <p style="margin: 0 0 6px;"><strong>转换规则说明</strong></p>
   <p style="margin: 0 0 4px;">在正文前面加上「[ ]」，里面放商品信息，格式为「商品名:金额」；金额留空时不加冒号，只显示商品名。</p>
@@ -184,6 +195,14 @@
   const inputText = document.getElementById('inputText');
   const outputText = document.getElementById('outputText');
   const convertBtn = document.getElementById('convertBtn');
+  const historyOutput = document.getElementById('historyOutput');
+
+  let resultHistory = [];
+
+  function renderHistory() {
+    historyOutput.value = JSON.stringify(resultHistory);
+  }
+  renderHistory();
 
   function createRow() {
     const row = document.createElement('div');
@@ -231,6 +250,9 @@
     });
     const prefix = groups.length ? '[' + groups.join('/') + ']' : '';
     outputText.value = prefix + inputText.value;
+
+    resultHistory.push(outputText.value);
+    renderHistory();
   });
 
   document.getElementById('clearBtn').addEventListener('click', () => {
@@ -251,6 +273,29 @@
     const hint = document.getElementById('copyHint');
     hint.style.visibility = 'visible';
     setTimeout(() => { hint.style.visibility = 'hidden'; }, 1500);
+  });
+
+  document.getElementById('historyCopyBtn').addEventListener('click', async () => {
+    if (!resultHistory.length) return;
+    try {
+      await navigator.clipboard.writeText(historyOutput.value);
+    } catch (e) {
+      historyOutput.select();
+      document.execCommand('copy');
+    }
+    const hint = document.getElementById('historyCopyHint');
+    hint.style.visibility = 'visible';
+    setTimeout(() => { hint.style.visibility = 'hidden'; }, 1500);
+  });
+
+  document.getElementById('historyUndoBtn').addEventListener('click', () => {
+    resultHistory.pop();
+    renderHistory();
+  });
+
+  document.getElementById('historyClearBtn').addEventListener('click', () => {
+    resultHistory = [];
+    renderHistory();
   });
 </script>
 
