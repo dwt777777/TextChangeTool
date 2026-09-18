@@ -128,26 +128,34 @@
     visibility: hidden;
   }
   footer {
-    text-align: center;
-    color: #999;
-    font-size: 0.85rem;
-    margin-top: 30px;
+    text-align: left;
+    color: #777;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin-top: 10px;
+    padding: 16px 18px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  footer strong {
+    color: #333;
   }
 </style>
 </head>
 <body>
 
 <h1>文本转换工具</h1>
-<p class="desc">填写商品名（必填）和金额（选填），再输入正文，点击"转换"即可在正文前拼接上 [商品名:金额] 信息。所有处理都在你的浏览器里完成，不会上传到任何服务器。</p>
-
-<div class="card">
-  <h2>商品信息</h2>
-  <div id="productRows"></div>
-</div>
+<p class="desc">输入正文，再填写商品名（必填）和金额（选填），点击"转换"即可在正文前拼接上商品信息。所有处理都在你的浏览器里完成，不会上传到任何服务器。</p>
 
 <div class="card">
   <label for="inputText">正文内容</label>
   <textarea id="inputText" placeholder="在这里粘贴或输入正文..."></textarea>
+</div>
+
+<div class="card">
+  <h2>商品信息</h2>
+  <div id="productRows"></div>
 
   <div class="row">
     <button id="convertBtn" disabled>转换</button>
@@ -164,7 +172,12 @@
   </div>
 </div>
 
-<footer>纯前端小工具 · 无需登录 · 数据仅存在于本地浏览器</footer>
+<footer>
+  <p style="margin: 0 0 6px;"><strong>转换规则说明</strong></p>
+  <p style="margin: 0 0 4px;">在正文前面加上「[ ]」，里面放商品信息，格式为「商品名:金额」；金额留空时不加冒号，只显示商品名。</p>
+  <p style="margin: 0 0 4px;">填了多组商品名和金额，用「/」把它们隔开。</p>
+  <p style="margin: 4px 0 0;">例如：[商品名:343424/商品名2]正文内容</p>
+</footer>
 
 <script>
   const productRows = document.getElementById('productRows');
@@ -214,7 +227,7 @@
       const name = row.querySelector('.product-name').value.trim();
       if (!name) return;
       const amount = row.querySelector('.product-amount').value.trim();
-      groups.push(name + ':' + amount);
+      groups.push(amount ? name + ':' + amount : name);
     });
     const prefix = groups.length ? '[' + groups.join('/') + ']' : '';
     outputText.value = prefix + inputText.value;
