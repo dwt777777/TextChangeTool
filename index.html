@@ -11,92 +11,126 @@
   * { box-sizing: border-box; }
   body {
     font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-    max-width: 720px;
+    max-width: 760px;
     margin: 40px auto;
     padding: 0 16px;
     background: #f5f6f8;
     color: #222;
+    font-size: 17px;
   }
   h1 {
-    font-size: 1.4rem;
+    font-size: 1.6rem;
     margin-bottom: 4px;
   }
   p.desc {
     color: #666;
     margin-top: 0;
     margin-bottom: 24px;
-    font-size: 0.9rem;
+    font-size: 1rem;
   }
   .card {
     background: #fff;
-    border-radius: 10px;
-    padding: 20px;
+    border-radius: 12px;
+    padding: 22px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-    margin-bottom: 20px;
+    margin-bottom: 22px;
+  }
+  .card h2 {
+    font-size: 1.1rem;
+    margin: 0 0 14px;
   }
   label {
     display: block;
     font-weight: 600;
-    margin-bottom: 6px;
-    font-size: 0.9rem;
+    margin-bottom: 8px;
+    font-size: 1rem;
   }
   textarea {
     width: 100%;
-    min-height: 140px;
-    padding: 10px;
+    min-height: 150px;
+    padding: 12px;
     border: 1px solid #ddd;
-    border-radius: 6px;
-    font-size: 0.95rem;
+    border-radius: 8px;
+    font-size: 1.05rem;
     font-family: inherit;
     resize: vertical;
   }
-  select, input[type="text"] {
+  input[type="text"] {
     width: 100%;
-    padding: 8px 10px;
+    padding: 12px;
     border: 1px solid #ddd;
-    border-radius: 6px;
-    font-size: 0.95rem;
-    margin-bottom: 10px;
+    border-radius: 8px;
+    font-size: 1.05rem;
+    font-family: inherit;
   }
-  .extra-fields {
-    display: none;
+  .product-row {
+    display: flex;
     gap: 10px;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
   }
-  .extra-fields.active {
-    display: block;
+  .product-row .product-name {
+    flex: 2;
+    min-width: 140px;
+  }
+  .product-row .product-amount {
+    flex: 1;
+    min-width: 110px;
+  }
+  .add-row-btn {
+    flex: 0 0 auto;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    font-size: 1.6rem;
+    line-height: 1;
+    border-radius: 8px;
+    background: #16a34a;
+  }
+  .add-row-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
   }
   .row {
     display: flex;
-    gap: 10px;
-    margin-top: 14px;
+    gap: 12px;
+    margin-top: 16px;
     flex-wrap: wrap;
   }
   button {
     background: #2563eb;
     color: #fff;
     border: none;
-    padding: 10px 18px;
-    border-radius: 6px;
-    font-size: 0.95rem;
+    padding: 14px 24px;
+    border-radius: 8px;
+    font-size: 1.05rem;
     cursor: pointer;
+    min-height: 48px;
   }
   button.secondary {
     background: #e5e7eb;
     color: #222;
   }
-  button:active {
+  button:disabled {
+    background: #ccc;
+    color: #888;
+    cursor: not-allowed;
+  }
+  button:active:not(:disabled) {
     opacity: 0.85;
   }
   #copyHint {
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     color: #16a34a;
     margin-left: 8px;
+    align-self: center;
     visibility: hidden;
   }
   footer {
     text-align: center;
     color: #999;
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     margin-top: 30px;
   }
 </style>
@@ -104,33 +138,19 @@
 <body>
 
 <h1>文本转换工具</h1>
-<p class="desc">输入一段文字，选择一个规则，点击"转换"即可得到处理后的结果。所有处理都在你的浏览器里完成，不会上传到任何服务器。</p>
+<p class="desc">填写商品名（必填）和金额（选填），再输入正文，点击"转换"即可在正文前拼接上 [商品名:金额] 信息。所有处理都在你的浏览器里完成，不会上传到任何服务器。</p>
 
 <div class="card">
-  <label for="inputText">原始文本</label>
-  <textarea id="inputText" placeholder="在这里粘贴或输入文字..."></textarea>
+  <h2>商品信息</h2>
+  <div id="productRows"></div>
+</div>
 
-  <label for="ruleSelect" style="margin-top:16px;">转换规则</label>
-  <select id="ruleSelect">
-    <option value="upper">转为大写</option>
-    <option value="lower">转为小写</option>
-    <option value="trim">去除首尾空格</option>
-    <option value="removeSpaces">去除所有空格</option>
-    <option value="replace">查找并替换</option>
-    <option value="reverse">反转文本</option>
-    <option value="capitalize">每个单词首字母大写</option>
-    <option value="dedupeLines">每行去重</option>
-  </select>
-
-  <div id="replaceFields" class="extra-fields">
-    <label for="findText">查找内容</label>
-    <input type="text" id="findText" placeholder="要查找的文字">
-    <label for="replaceText">替换为</label>
-    <input type="text" id="replaceText" placeholder="替换成的文字">
-  </div>
+<div class="card">
+  <label for="inputText">正文内容</label>
+  <textarea id="inputText" placeholder="在这里粘贴或输入正文..."></textarea>
 
   <div class="row">
-    <button id="convertBtn">转换</button>
+    <button id="convertBtn" disabled>转换</button>
     <button id="clearBtn" class="secondary" type="button">清空</button>
   </div>
 </div>
@@ -147,52 +167,64 @@
 <footer>纯前端小工具 · 无需登录 · 数据仅存在于本地浏览器</footer>
 
 <script>
-  const ruleSelect = document.getElementById('ruleSelect');
-  const replaceFields = document.getElementById('replaceFields');
+  const productRows = document.getElementById('productRows');
   const inputText = document.getElementById('inputText');
   const outputText = document.getElementById('outputText');
-  const findText = document.getElementById('findText');
-  const replaceText = document.getElementById('replaceText');
+  const convertBtn = document.getElementById('convertBtn');
 
-  const rules = {
-    upper: (text) => text.toUpperCase(),
-    lower: (text) => text.toLowerCase(),
-    trim: (text) => text.trim(),
-    removeSpaces: (text) => text.replace(/\s+/g, ''),
-    replace: (text) => {
-      const find = findText.value;
-      if (!find) return text;
-      return text.split(find).join(replaceText.value);
-    },
-    reverse: (text) => text.split('').reverse().join(''),
-    capitalize: (text) => text.replace(/\b\w/g, (c) => c.toUpperCase()),
-    dedupeLines: (text) => {
-      const seen = new Set();
-      return text.split('\n').filter((line) => {
-        if (seen.has(line)) return false;
-        seen.add(line);
-        return true;
-      }).join('\n');
-    }
-  };
-
-  function updateExtraFields() {
-    replaceFields.classList.toggle('active', ruleSelect.value === 'replace');
+  function createRow() {
+    const row = document.createElement('div');
+    row.className = 'product-row';
+    row.innerHTML =
+      '<input type="text" class="product-name" placeholder="商品名（必填）">' +
+      '<input type="text" class="product-amount" placeholder="金额（选填）">' +
+      '<button type="button" class="add-row-btn" title="再加一行">+</button>';
+    return row;
   }
 
-  ruleSelect.addEventListener('change', updateExtraFields);
-  updateExtraFields();
+  function addRow() {
+    const oldBtn = productRows.querySelector('.add-row-btn');
+    if (oldBtn) oldBtn.remove();
+    const row = createRow();
+    productRows.appendChild(row);
+    row.querySelector('.add-row-btn').addEventListener('click', addRow);
+    updateState();
+  }
 
-  document.getElementById('convertBtn').addEventListener('click', () => {
-    const rule = rules[ruleSelect.value];
-    outputText.value = rule ? rule(inputText.value) : inputText.value;
+  function updateState() {
+    const nameInputs = productRows.querySelectorAll('.product-name');
+    const names = Array.from(nameInputs).map((el) => el.value.trim());
+
+    const lastName = names[names.length - 1];
+    const addBtn = productRows.querySelector('.add-row-btn');
+    if (addBtn) addBtn.disabled = !lastName;
+
+    const hasAnyName = names.some((v) => v);
+    convertBtn.disabled = !hasAnyName;
+  }
+
+  productRows.addEventListener('input', updateState);
+
+  addRow();
+
+  convertBtn.addEventListener('click', () => {
+    const rows = productRows.querySelectorAll('.product-row');
+    const groups = [];
+    rows.forEach((row) => {
+      const name = row.querySelector('.product-name').value.trim();
+      if (!name) return;
+      const amount = row.querySelector('.product-amount').value.trim();
+      groups.push(name + ':' + amount);
+    });
+    const prefix = groups.length ? '[' + groups.join('/') + ']' : '';
+    outputText.value = prefix + inputText.value;
   });
 
   document.getElementById('clearBtn').addEventListener('click', () => {
     inputText.value = '';
     outputText.value = '';
-    findText.value = '';
-    replaceText.value = '';
+    productRows.innerHTML = '';
+    addRow();
   });
 
   document.getElementById('copyBtn').addEventListener('click', async () => {
