@@ -309,7 +309,7 @@
     row.innerHTML =
       '<textarea class="product-name" rows="2" placeholder="商品名（必填），文字较长会自动换行显示"></textarea>' +
       '<div class="product-row-bottom">' +
-        '<input type="text" class="product-amount" placeholder="金额（选填）">' +
+        '<input type="text" class="product-amount" placeholder="金额（选填）" inputmode="numeric" pattern="[0-9]*">' +
         '<button type="button" class="add-row-btn" title="再加一行">+</button>' +
       '</div>';
     return row;
@@ -344,6 +344,10 @@
 
   productRows.addEventListener('input', (e) => {
     if (e.target.classList.contains('product-name')) autoGrow(e.target);
+    if (e.target.classList.contains('product-amount')) {
+      const digitsOnly = e.target.value.replace(/[^0-9]/g, '');
+      if (digitsOnly !== e.target.value) e.target.value = digitsOnly;
+    }
     updateState();
   });
 
