@@ -257,6 +257,26 @@
     font-size: 0.95rem;
     font-weight: 600;
   }
+  select {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 1.05rem;
+    font-family: inherit;
+    background: #fff;
+    min-height: 48px;
+  }
+  select:disabled {
+    background: #f1f3f7;
+    color: #999;
+  }
+  .hint-blue {
+    color: #2563eb;
+    font-size: 0.92rem;
+    margin: 0;
+    align-self: center;
+  }
   footer {
     text-align: left;
     color: #777;
@@ -279,7 +299,7 @@
     .row button {
       width: 100%;
     }
-    #copyHint, #historyCopyHint, #skillCopyHint {
+    #copyHint, #historyCopyHint, #skillCopyHint, .hint-blue {
       text-align: center;
     }
   }
@@ -288,23 +308,35 @@
 <body>
 
 <h1>文本转换工具</h1>
-<p class="desc">按下面五步操作：填正文数字 → 填商品信息 → 转换 → 结果自动累积 → 复制指令发给 Claude。所有处理都在你的浏览器里完成，不会上传到任何服务器。</p>
+<p class="desc">选文件夹 → 选文件 → 填商品信息 → 转换 → 累积 → 一键改名。所有处理都在你的浏览器里完成，不会上传到任何服务器。</p>
 
 <div class="card">
-  <label class="card-head" for="imgNumber">
+  <div class="card-head">
     <span class="step-badge">1</span>
+    <h2>选择文件夹</h2>
+    <span id="renameFolder" class="count-badge"></span>
+  </div>
+  <p class="hint" id="renameUnsupported" style="display:none; margin-top:0; color:#b45309;"></p>
+  <div class="row" id="folderActions" style="margin-top:0;">
+    <button id="pickFolderBtn" class="btn-outline" type="button">选择「メルカリ出品」文件夹</button>
+  </div>
+  <p class="hint">选中之后，下一步就能直接从文件夹里挑文件名，最后一步也才能执行改名。</p>
+</div>
+
+<div class="card">
+  <label class="card-head" for="fileSelect">
+    <span class="step-badge">2</span>
     <h2 style="display:inline; margin:0;">正文内容</h2>
   </label>
-  <div class="input-group">
-    <span class="input-prefix">IMG_</span>
-    <input type="text" id="imgNumber" inputmode="numeric" pattern="[0-9]*" placeholder="数字（位数不限，例如 1234）">
-  </div>
-  <p class="hint">正文固定为 IMG_ 加数字，这里只填数字部分即可</p>
+  <select id="fileSelect" disabled>
+    <option value="">请先在第 1 步选择文件夹</option>
+  </select>
+  <p class="hint" id="fileSelectHint">选中的文件名就是正文，已有的 [ ] 前缀和扩展名会自动去掉。</p>
 </div>
 
 <div class="card">
   <div class="card-head">
-    <span class="step-badge">2</span>
+    <span class="step-badge">3</span>
     <h2>商品信息</h2>
   </div>
   <div id="productRows"></div>
@@ -318,7 +350,7 @@
 
 <div class="card">
   <label class="card-head" for="outputText">
-    <span class="step-badge">3</span>
+    <span class="step-badge">4</span>
     <h2 style="display:inline; margin:0;">转换结果</h2>
   </label>
   <textarea id="outputText" readonly placeholder="点击“转换”后，结果会显示在这里"></textarea>
@@ -330,7 +362,7 @@
 
 <div class="card">
   <div class="card-head">
-    <span class="step-badge">4</span>
+    <span class="step-badge">5</span>
     <h2>累积结果</h2>
     <span id="historyCount" class="count-badge"></span>
   </div>
@@ -345,7 +377,7 @@
 
 <div class="card">
   <label class="card-head" for="skillCommand">
-    <span class="step-badge">5</span>
+    <span class="step-badge">6</span>
     <h2 style="display:inline; margin:0;">发给 Claude 的指令</h2>
   </label>
   <textarea id="skillCommand" readonly placeholder="累积结果出来后，这里会生成可以直接粘贴给 Claude 的完整指令"></textarea>
@@ -358,22 +390,20 @@
 
 <div class="card">
   <div class="card-head">
-    <span class="step-badge">6</span>
-    <h2>直接改名（不经过 Claude）</h2>
-    <span id="renameFolder" class="count-badge"></span>
+    <span class="step-badge">7</span>
+    <h2>执行改名</h2>
   </div>
-  <p class="hint" style="margin-top:0;">和第 5 步二选一。选中「メルカリ出品」文件夹后，按累积结果直接改名，规则与 rename-photos skill 一致：取末尾数字匹配，只改唯一命中的那一个。</p>
-  <p class="hint" id="renameUnsupported" style="display:none; color:#b45309;"></p>
-  <div class="row" id="renameActions">
-    <button id="pickFolderBtn" class="btn-outline" type="button">选择文件夹</button>
+  <p class="hint" style="margin-top:0;">和第 6 步二选一。按累积结果直接改名，规则与 rename-photos skill 一致：取末尾数字匹配，只改唯一命中的那一个。</p>
+  <div class="row" id="renameActions" style="margin-top:12px;">
     <button id="renameBtn" type="button" disabled>执行改名</button>
+    <p class="hint-blue" id="renameHint">请先在第 1 步选择文件夹</p>
   </div>
   <div id="renameResult"></div>
 </div>
 
 <footer>
   <p style="margin: 0 0 6px;"><strong>转换规则说明</strong></p>
-  <p style="margin: 0 0 4px;">正文固定为「IMG_」加数字，只需填数字部分，位数不限。</p>
+  <p style="margin: 0 0 4px;">正文取自第 2 步选中的文件名，会自动去掉扩展名和已有的「[ ]」前缀。</p>
   <p style="margin: 0 0 4px;">在正文前面加上「[ ]」，里面放商品信息，格式为「商品名=金额」；金额留空时不加 = 符号，只显示商品名。</p>
   <p style="margin: 0 0 4px;">填了多组商品名和金额，用「,」（半角逗号）把它们隔开。</p>
   <p style="margin: 4px 0 0;">例如：[商品名=343424,商品名2]IMG_1234</p>
@@ -381,7 +411,8 @@
 
 <script>
   const productRows = document.getElementById('productRows');
-  const imgNumber = document.getElementById('imgNumber');
+  const fileSelect = document.getElementById('fileSelect');
+  const fileSelectHint = document.getElementById('fileSelectHint');
   const outputText = document.getElementById('outputText');
   const convertBtn = document.getElementById('convertBtn');
   const convertHint = document.getElementById('convertHint');
@@ -461,13 +492,13 @@
     if (addBtn) addBtn.disabled = !lastName;
 
     const hasAnyName = names.some((v) => v);
-    const hasNumber = imgNumber.value !== '';
-    convertBtn.disabled = !hasAnyName || !hasNumber;
+    const hasBody = fileSelect.value !== '';
+    convertBtn.disabled = !hasAnyName || !hasBody;
     convertHint.style.display = convertBtn.disabled ? 'block' : 'none';
-    if (!hasNumber && !hasAnyName) {
-      convertHint.textContent = '先填写正文数字和至少一个商品名，转换按钮才会启用';
-    } else if (!hasNumber) {
-      convertHint.textContent = '先填写正文的数字部分，转换按钮才会启用';
+    if (!hasBody && !hasAnyName) {
+      convertHint.textContent = '先在第 2 步选好文件、并填写至少一个商品名，转换按钮才会启用';
+    } else if (!hasBody) {
+      convertHint.textContent = '先在第 2 步选一个文件，转换按钮才会启用';
     } else {
       convertHint.textContent = '先填写至少一个商品名，转换按钮才会启用';
     }
@@ -487,9 +518,10 @@
     updateState();
   });
 
-  imgNumber.addEventListener('input', () => {
-    const digitsOnly = imgNumber.value.replace(/[^0-9]/g, '');
-    if (digitsOnly !== imgNumber.value) imgNumber.value = digitsOnly;
+  fileSelect.addEventListener('change', () => {
+    fileSelectHint.textContent = fileSelect.value
+      ? '正文将使用：' + bodyFromFile(fileSelect.value)
+      : '选中的文件名就是正文，已有的 [ ] 前缀和扩展名会自动去掉。';
     updateState();
   });
 
@@ -509,7 +541,7 @@
       groups.push(amount ? name + '=' + amount : name);
     });
     const prefix = groups.length ? '[' + groups.join(',') + ']' : '';
-    outputText.value = prefix + 'IMG_' + imgNumber.value;
+    outputText.value = prefix + bodyFromFile(fileSelect.value);
     flash(outputText);
 
     resultHistory.push(outputText.value);
@@ -518,7 +550,8 @@
   });
 
   document.getElementById('clearBtn').addEventListener('click', () => {
-    imgNumber.value = '';
+    fileSelect.selectedIndex = 0;
+    fileSelect.dispatchEvent(new Event('change'));
     outputText.value = '';
     productRows.innerHTML = '';
     addRow();
@@ -552,6 +585,7 @@
   const renameFolder = document.getElementById('renameFolder');
   const renameResult = document.getElementById('renameResult');
   const renameBtn = document.getElementById('renameBtn');
+  const renameHint = document.getElementById('renameHint');
   const pickFolderBtn = document.getElementById('pickFolderBtn');
 
   const fsSupported = typeof window.showDirectoryPicker === 'function'
@@ -577,6 +611,35 @@
   function tailDigits(s) {
     const m = /(\d+)\s*$/.exec(s);
     return m ? m[1] : null;
+  }
+
+  // 文件名 → 正文：去掉图片扩展名，再去掉已有的 [ ] 前缀，避免改名时前缀套前缀
+  function bodyFromFile(name) {
+    return splitName(name)[0].replace(/^\[[^\]]*\]/, '');
+  }
+
+  function populateFileSelect() {
+    const picked = fileSelect.value;
+    const images = dirFiles
+      .filter((f) => IMG_EXTS.includes(rawExt(f).toLowerCase()))
+      .sort((a, b) => a.localeCompare(b, 'ja'));
+
+    fileSelect.innerHTML = '';
+    const first = document.createElement('option');
+    first.value = '';
+    first.textContent = images.length ? '请选择一个文件（' + images.length + ' 个）' : '文件夹里没有图片文件';
+    fileSelect.appendChild(first);
+
+    images.forEach((name) => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      fileSelect.appendChild(opt);
+    });
+
+    fileSelect.disabled = !images.length;
+    if (images.includes(picked)) fileSelect.value = picked;
+    fileSelect.dispatchEvent(new Event('change'));
   }
 
   // 商品名里本身带半角逗号，所以只能按 "," 切，不能按裸逗号切
@@ -686,11 +749,19 @@
   }
 
   function refreshPreview() {
-    if (!fsSupported || !dirHandle) return;
+    if (!fsSupported) return;
+    if (!dirHandle) {
+      renameBtn.disabled = true;
+      renameHint.textContent = '请先在第 1 步选择文件夹';
+      return;
+    }
     const rows = planRenames(parseItems(historyOutput.value), dirFiles);
     const readyCount = rows.filter((r) => r.state === 'ready').length;
     renameBtn.disabled = !readyCount;
     renameBtn.textContent = readyCount ? '执行改名（' + readyCount + ' 个）' : '执行改名';
+    renameHint.textContent = readyCount
+      ? '点击后立即改名 ' + readyCount + ' 个文件，下方表格是本次要改的内容'
+      : (rows.length ? '累积结果里没有能匹配上的文件，见下方表格' : '第 5 步还没有累积结果');
     renderRenameRows(rows, false);
   }
 
@@ -703,11 +774,13 @@
   }
 
   if (!fsSupported) {
+    document.getElementById('folderActions').style.display = 'none';
     document.getElementById('renameActions').style.display = 'none';
     const notice = document.getElementById('renameUnsupported');
     notice.style.display = 'block';
-    notice.textContent = '这个浏览器不支持直接改名（iPhone / iPad 上所有浏览器都不支持）。'
-      + '请在 Mac 或 PC 上用 Chrome / Edge 打开本页，或者改用第 5 步把指令复制给 Claude。';
+    notice.textContent = '这个浏览器不支持直接读写文件夹（iPhone / iPad 上所有浏览器都不支持）。'
+      + '请在 Mac 或 PC 上用 Chrome / Edge 打开本页，或者改用第 6 步把指令复制给 Claude。';
+    fileSelect.innerHTML = '<option value="">这个浏览器不支持选择文件夹</option>';
   } else {
     pickFolderBtn.addEventListener('click', async () => {
       try {
@@ -718,6 +791,7 @@
       dirFiles = await readDirFiles();
       renameFolder.textContent = dirHandle.name + '（' + dirFiles.length + ' 个文件）';
       pickFolderBtn.textContent = '重新选择文件夹';
+      populateFileSelect();
       refreshPreview();
     });
 
@@ -744,6 +818,10 @@
       renameFolder.textContent = dirHandle.name + '（' + dirFiles.length + ' 个文件）';
       renderRenameRows(rows, true);
       renameBtn.textContent = '执行改名';
+
+      const okCount = rows.filter((r) => r.state === 'done').length;
+      renameHint.textContent = '已改名 ' + okCount + ' 个，下拉列表已刷新';
+      populateFileSelect(); // 文件名变了，第 2 步的列表要跟着更新
     });
   }
 
