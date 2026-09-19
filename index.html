@@ -252,6 +252,14 @@
   .st-ok { color: #16a34a; white-space: nowrap; }
   .st-skip { color: #b45309; }
   .st-err { color: #dc2626; }
+  button.list-btn {
+    display: block;
+    margin-top: 8px;
+    padding: 6px 12px;
+    min-height: 0;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
   .rename-summary {
     margin: 14px 0 0;
     font-size: 0.95rem;
@@ -497,7 +505,7 @@
 
   function renderHistory() {
     historyOutput.value = resultHistory.length
-      ? '{' + resultHistory.map((v) => JSON.stringify(v)).join(',') + '}'
+      ? '{' + resultHistory.map((r) => JSON.stringify(r.text)).join(',') + '}'
       : '';
     historyCount.textContent = resultHistory.length ? ('共 ' + resultHistory.length + ' 条') : '';
     skillCommand.value = resultHistory.length ? SKILL_NAME + ' ' + historyOutput.value : '';
@@ -635,18 +643,21 @@
   convertBtn.addEventListener('click', () => {
     const rows = productRows.querySelectorAll('.product-row');
     const groups = [];
+    const items = [];
     rows.forEach((row) => {
       const name = row.querySelector('.product-name').value.trim();
       if (!name) return;
       const amount = row.querySelector('.product-amount').value.trim();
       groups.push(amount ? name + '=' + amount : name);
+      items.push(amount ? { name, price: Number(amount) } : { name });
     });
     const prefix = groups.length ? '[' + groups.join(',') + ']' : '';
     outputText.value = prefix + currentBody();
     flash(outputText);
     showLength();
 
-    resultHistory.push(outputText.value);
+    // 同时留一份结构化数据，存进清单时就不用再把文件名反解析回来
+    resultHistory.push({ text: outputText.value, body: currentBody(), items });
     renderHistory();
     flash(historyOutput);
   });
@@ -839,9 +850,10 @@
     return raw.split('\n').map((l) => l.trim()).filter((l) => l);
   }
 
-  function planRenames(items, fileNames) {
+  function planRenames(items, fileNames, entries) {
     const files = fileNames.slice();
-    return items.map((item) => {
+    return items.map((item, i) => {
+      const entry = entries && entries[i];
       const [base, itemExt] = splitName(item);
       const num = tailDigits(base);
       if (!num) return { num: '-', old: '', neu: '', state: 'skip', note: '输入末尾没有数字' };
@@ -861,7 +873,7 @@
       const bytes = nameBytes(neu);
       if (bytes > MAX_NAME_BYTES) {
         return {
-          num, old, neu, state: 'skip',
+          num, old, neu, state: 'skip', entry,
           note: '文件名过长：' + bytes + ' 字节，上限 ' + MAX_NAME_BYTES
             + '，需再短 ' + (bytes - MAX_NAME_BYTES) + ' 字节'
         };
@@ -872,6 +884,70 @@
       files[files.indexOf(old)] = neu;
       return { num, old, neu, state: 'ready' };
     });
+  }
+
+  const MANIFEST_NAME = 'list.json';
+  const LIST_PREFIX = '[list]';
+
+  async function readManifest() {
+    let text;
+    try {
+      text = await (await (await dirHandle.getFileHandle(MANIFEST_NAME)).getFile()).text();
+    } catch (e) {
+      return {}; // 还没有清单
+    }
+    if (!text.trim()) return {};
+    return JSON.parse(text); // 内容坏掉就抛错，绝不拿空清单覆盖掉原有数据
+  }
+
+  async function writeManifest(data) {
+    const fh = await dirHandle.getFileHandle(MANIFEST_NAME, { create: true });
+    const w = await fh.createWritable();
+    await w.write(JSON.stringify(data, null, 2));
+    await w.close();
+  }
+
+  // 商品信息存进清单，文件名换成短的 [list] 前缀
+  async function moveToList(row) {
+    const target = LIST_PREFIX + row.entry.body + rawExt(row.old);
+    dirFiles = await readDirFiles();
+    if (target !== row.old && dirFiles.includes(target)) {
+      throw new Error('目标文件名 ' + target + ' 已存在');
+    }
+
+    // 先写清单再改名：万一改名失败，清单里多一条无害；反过来就会出现查不到信息的 [list] 文件
+    const manifest = await readManifest();
+    manifest[row.entry.body] = row.entry.items;
+    await writeManifest(manifest);
+
+    if (target !== row.old) {
+      await (await dirHandle.getFileHandle(row.old)).move(target);
+    }
+    return target;
+  }
+
+  function makeListButton(row, rows, done) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-outline list-btn';
+    btn.textContent = '存入清单';
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = '存入中…';
+      try {
+        const target = await moveToList(row);
+        row.state = 'listed';
+        row.neu = target;
+        dirFiles = await readDirFiles();
+        renameFolder.textContent = dirHandle.name + '（' + dirFiles.length + ' 个文件）';
+        populateFileSelect();
+      } catch (e) {
+        row.state = 'error';
+        row.note = e.message || String(e);
+      }
+      renderRenameRows(rows, done);
+    });
+    return btn;
   }
 
   function renderRenameRows(rows, done) {
@@ -914,9 +990,13 @@
       } else if (r.state === 'error') {
         tdState.className = 'st-err';
         tdState.textContent = '⚠️ ' + r.note;
+      } else if (r.state === 'listed') {
+        tdState.className = 'st-ok';
+        tdState.textContent = '✅ 已存入清单';
       } else {
         tdState.className = 'st-skip';
         tdState.textContent = '⏭ ' + r.note;
+        if (r.entry) tdState.appendChild(makeListButton(r, rows, done));
       }
 
       tr.append(tdNum, tdName, tdState);
@@ -943,7 +1023,7 @@
       renameHint.textContent = '请先在第 1 步选择文件夹';
       return;
     }
-    const rows = planRenames(parseItems(historyOutput.value), dirFiles);
+    const rows = planRenames(parseItems(historyOutput.value), dirFiles, resultHistory);
     const readyCount = rows.filter((r) => r.state === 'ready').length;
     renameBtn.disabled = !readyCount;
     renameBtn.textContent = readyCount ? '执行改名（' + readyCount + ' 个）' : '执行改名';
@@ -993,7 +1073,7 @@
     renameBtn.addEventListener('click', async () => {
       renameBtn.disabled = true;
       dirFiles = await readDirFiles(); // 以执行前的真实目录为准
-      const rows = planRenames(parseItems(historyOutput.value), dirFiles);
+      const rows = planRenames(parseItems(historyOutput.value), dirFiles, resultHistory);
 
       // 每改一个就刷新一次表格：万一中途失败，也能看清已经改到哪了
       for (const row of rows) {
