@@ -215,7 +215,7 @@
   button:active:not(:disabled) {
     opacity: 0.8;
   }
-  #copyHint, #historyCopyHint {
+  #copyHint, #historyCopyHint, #skillCopyHint {
     font-size: 0.95rem;
     color: #16a34a;
     visibility: hidden;
@@ -242,7 +242,7 @@
     .row button {
       width: 100%;
     }
-    #copyHint, #historyCopyHint {
+    #copyHint, #historyCopyHint, #skillCopyHint {
       text-align: center;
     }
   }
@@ -251,7 +251,7 @@
 <body>
 
 <h1>文本转换工具</h1>
-<p class="desc">按下面四步操作：填正文数字 → 填商品信息 → 转换 → 结果自动累积。所有处理都在你的浏览器里完成，不会上传到任何服务器。</p>
+<p class="desc">按下面五步操作：填正文数字 → 填商品信息 → 转换 → 结果自动累积 → 复制指令发给 Claude。所有处理都在你的浏览器里完成，不会上传到任何服务器。</p>
 
 <div class="card">
   <label class="card-head" for="imgNumber">
@@ -306,6 +306,19 @@
   </div>
 </div>
 
+<div class="card">
+  <label class="card-head" for="skillCommand">
+    <span class="step-badge">5</span>
+    <h2 style="display:inline; margin:0;">发给 Claude 的指令</h2>
+  </label>
+  <textarea id="skillCommand" readonly placeholder="累积结果出来后，这里会生成可以直接粘贴给 Claude 的完整指令"></textarea>
+  <div class="row">
+    <button id="copySkillBtn" type="button" disabled>复制指令</button>
+    <span id="skillCopyHint">✓ 已复制</span>
+  </div>
+  <p class="hint">复制后切到 Claude Cowork，粘贴进对话框回车即可执行改名。</p>
+</div>
+
 <footer>
   <p style="margin: 0 0 6px;"><strong>转换规则说明</strong></p>
   <p style="margin: 0 0 4px;">正文固定为「IMG_」加数字，只需填数字部分，位数不限。</p>
@@ -322,6 +335,10 @@
   const convertHint = document.getElementById('convertHint');
   const historyOutput = document.getElementById('historyOutput');
   const historyCount = document.getElementById('historyCount');
+  const skillCommand = document.getElementById('skillCommand');
+  const copySkillBtn = document.getElementById('copySkillBtn');
+
+  const SKILL_NAME = '/anthropic-skills:flea-market-rename-photos';
 
   let resultHistory = [];
 
@@ -338,8 +355,29 @@
       ? '{' + resultHistory.map((v) => JSON.stringify(v)).join(',') + '}'
       : '';
     historyCount.textContent = resultHistory.length ? ('共 ' + resultHistory.length + ' 条') : '';
+    skillCommand.value = resultHistory.length ? SKILL_NAME + ' ' + historyOutput.value : '';
+    copySkillBtn.disabled = !resultHistory.length;
   }
   renderHistory();
+
+  async function copyText(text, hint) {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      const temp = document.createElement('textarea');
+      temp.value = text;
+      temp.style.position = 'fixed';
+      temp.style.opacity = '0';
+      document.body.appendChild(temp);
+      temp.select();
+      document.execCommand('copy');
+      temp.remove();
+    }
+    hint.style.visibility = 'visible';
+    clearTimeout(hint._timer);
+    hint._timer = setTimeout(() => { hint.style.visibility = 'hidden'; }, 1500);
+  }
 
   function createRow() {
     const row = document.createElement('div');
@@ -434,30 +472,16 @@
     addRow();
   });
 
-  document.getElementById('copyBtn').addEventListener('click', async () => {
-    if (!outputText.value) return;
-    try {
-      await navigator.clipboard.writeText(outputText.value);
-    } catch (e) {
-      outputText.select();
-      document.execCommand('copy');
-    }
-    const hint = document.getElementById('copyHint');
-    hint.style.visibility = 'visible';
-    setTimeout(() => { hint.style.visibility = 'hidden'; }, 1500);
+  document.getElementById('copyBtn').addEventListener('click', () => {
+    copyText(outputText.value, document.getElementById('copyHint'));
   });
 
-  document.getElementById('historyCopyBtn').addEventListener('click', async () => {
-    if (!resultHistory.length) return;
-    try {
-      await navigator.clipboard.writeText(historyOutput.value);
-    } catch (e) {
-      historyOutput.select();
-      document.execCommand('copy');
-    }
-    const hint = document.getElementById('historyCopyHint');
-    hint.style.visibility = 'visible';
-    setTimeout(() => { hint.style.visibility = 'hidden'; }, 1500);
+  document.getElementById('historyCopyBtn').addEventListener('click', () => {
+    copyText(historyOutput.value, document.getElementById('historyCopyHint'));
+  });
+
+  copySkillBtn.addEventListener('click', () => {
+    copyText(skillCommand.value, document.getElementById('skillCopyHint'));
   });
 
   document.getElementById('historyUndoBtn').addEventListener('click', () => {
