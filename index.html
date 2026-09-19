@@ -343,7 +343,7 @@
   <button id="helpBtn" class="help-btn" type="button" aria-expanded="false" aria-label="转换规则说明">?</button>
   <div id="helpPopover" class="help-popover" role="dialog" aria-label="转换规则说明" hidden>
     <p style="margin: 0 0 6px;"><strong>转换规则说明</strong></p>
-    <p style="margin: 0 0 4px;">正文取自第 2 步选中的文件名，会自动去掉扩展名和已有的「[ ]」前缀。</p>
+    <p style="margin: 0 0 4px;">正文取自第 2 步：能选文件夹时是选中的文件名（自动去掉扩展名和已有的「[ ]」前缀），否则是手输的 IMG_ 加数字。</p>
     <p style="margin: 0 0 4px;">在正文前面加上「[ ]」，里面放商品信息，格式为「商品名=金额」；金额留空时不加 = 符号，只显示商品名。</p>
     <p style="margin: 0 0 4px;">填了多组商品名和金额，用「,」（半角逗号）把它们隔开。</p>
     <p style="margin: 4px 0 0;">例如：[商品名=343424,商品名2]IMG_1234</p>
@@ -361,17 +361,21 @@
   <div class="row" id="folderActions" style="margin-top:0;">
     <button id="pickFolderBtn" class="btn-outline" type="button">选择「メルカリ出品」文件夹</button>
   </div>
-  <p class="hint">选中之后，下一步就能直接从文件夹里挑文件名，最后一步也才能执行改名。</p>
+  <p class="hint" id="folderHint">选中之后，下一步就能直接从文件夹里挑文件名，最后一步也才能执行改名。</p>
 </div>
 
 <div class="card">
-  <label class="card-head" for="fileSelect">
+  <label class="card-head" for="fileSelect" id="bodyLabel">
     <span class="step-badge">2</span>
     <h2 style="display:inline; margin:0;">正文内容</h2>
   </label>
   <select id="fileSelect" disabled>
     <option value="">请先在第 1 步选择文件夹</option>
   </select>
+  <div class="input-group" id="imgNumberGroup" style="display:none;">
+    <span class="input-prefix">IMG_</span>
+    <input type="text" id="imgNumber" inputmode="numeric" pattern="[0-9]*" placeholder="数字（位数不限，例如 1234）">
+  </div>
   <p class="hint" id="fileSelectHint">选中的文件名就是正文，已有的 [ ] 前缀和扩展名会自动去掉。</p>
 </div>
 
@@ -443,9 +447,16 @@
 </div>
 
 <script>
+  // 不支持读写文件夹的浏览器（iPhone / iPad）退回到手输 IMG_ 编号
+  const fsSupported = typeof window.showDirectoryPicker === 'function'
+    && typeof FileSystemFileHandle !== 'undefined'
+    && 'move' in FileSystemFileHandle.prototype;
+
   const productRows = document.getElementById('productRows');
   const fileSelect = document.getElementById('fileSelect');
   const fileSelectHint = document.getElementById('fileSelectHint');
+  const imgNumber = document.getElementById('imgNumber');
+  const imgNumberGroup = document.getElementById('imgNumberGroup');
   const outputText = document.getElementById('outputText');
   const convertBtn = document.getElementById('convertBtn');
   const convertHint = document.getElementById('convertHint');
@@ -525,16 +536,21 @@
     if (addBtn) addBtn.disabled = !lastName;
 
     const hasAnyName = names.some((v) => v);
-    const hasBody = fileSelect.value !== '';
-    convertBtn.disabled = !hasAnyName || !hasBody;
+    const bodyFilled = fsSupported ? fileSelect.value !== '' : imgNumber.value !== '';
+    const bodyWord = fsSupported ? '选一个文件' : '填写正文数字';
+    convertBtn.disabled = !hasAnyName || !bodyFilled;
     convertHint.style.display = convertBtn.disabled ? 'block' : 'none';
-    if (!hasBody && !hasAnyName) {
-      convertHint.textContent = '先在第 2 步选好文件、并填写至少一个商品名，转换按钮才会启用';
-    } else if (!hasBody) {
-      convertHint.textContent = '先在第 2 步选一个文件，转换按钮才会启用';
+    if (!bodyFilled && !hasAnyName) {
+      convertHint.textContent = '先在第 2 步' + bodyWord + '、并填写至少一个商品名，转换按钮才会启用';
+    } else if (!bodyFilled) {
+      convertHint.textContent = '先在第 2 步' + bodyWord + '，转换按钮才会启用';
     } else {
       convertHint.textContent = '先填写至少一个商品名，转换按钮才会启用';
     }
+  }
+
+  function currentBody() {
+    return fsSupported ? bodyFromFile(fileSelect.value) : 'IMG_' + imgNumber.value;
   }
 
   function autoGrow(el) {
@@ -558,6 +574,12 @@
     updateState();
   });
 
+  imgNumber.addEventListener('input', () => {
+    const digitsOnly = imgNumber.value.replace(/[^0-9]/g, '');
+    if (digitsOnly !== imgNumber.value) imgNumber.value = digitsOnly;
+    updateState();
+  });
+
   window.addEventListener('resize', () => {
     productRows.querySelectorAll('.product-name').forEach(autoGrow);
   });
@@ -574,7 +596,7 @@
       groups.push(amount ? name + '=' + amount : name);
     });
     const prefix = groups.length ? '[' + groups.join(',') + ']' : '';
-    outputText.value = prefix + bodyFromFile(fileSelect.value);
+    outputText.value = prefix + currentBody();
     flash(outputText);
 
     resultHistory.push(outputText.value);
@@ -583,8 +605,12 @@
   });
 
   document.getElementById('clearBtn').addEventListener('click', () => {
-    fileSelect.selectedIndex = 0;
-    fileSelect.dispatchEvent(new Event('change'));
+    if (fsSupported) {
+      fileSelect.selectedIndex = 0;
+      fileSelect.dispatchEvent(new Event('change'));
+    } else {
+      imgNumber.value = '';
+    }
     outputText.value = '';
     productRows.innerHTML = '';
     addRow();
@@ -620,10 +646,6 @@
   const renameBtn = document.getElementById('renameBtn');
   const renameHint = document.getElementById('renameHint');
   const pickFolderBtn = document.getElementById('pickFolderBtn');
-
-  const fsSupported = typeof window.showDirectoryPicker === 'function'
-    && typeof FileSystemFileHandle !== 'undefined'
-    && 'move' in FileSystemFileHandle.prototype;
 
   let dirHandle = null;
   let dirFiles = [];
@@ -808,12 +830,19 @@
 
   if (!fsSupported) {
     document.getElementById('folderActions').style.display = 'none';
+    document.getElementById('folderHint').style.display = 'none';
     document.getElementById('renameActions').style.display = 'none';
     const notice = document.getElementById('renameUnsupported');
     notice.style.display = 'block';
     notice.textContent = '这个浏览器不支持直接读写文件夹（iPhone / iPad 上所有浏览器都不支持）。'
       + '请在 Mac 或 PC 上用 Chrome / Edge 打开本页，或者改用第 6 步把指令复制给 Claude。';
-    fileSelect.innerHTML = '<option value="">这个浏览器不支持选择文件夹</option>';
+
+    // 正文退回手输模式
+    fileSelect.style.display = 'none';
+    imgNumberGroup.style.display = 'flex';
+    document.getElementById('bodyLabel').setAttribute('for', 'imgNumber');
+    fileSelectHint.textContent = '正文固定为 IMG_ 加数字，这里只填数字部分即可。';
+    updateState();
   } else {
     pickFolderBtn.addEventListener('click', async () => {
       try {
