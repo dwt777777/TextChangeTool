@@ -571,22 +571,23 @@
     return fsSupported ? bodyFromFile(fileSelect.value) : 'IMG_' + imgNumber.value;
   }
 
-  // 文件名按字节算，日文 1 字 = 3 字节，很容易在字符数看着不多时就超限
+  // 文件名按字节算：日文 1 字约 3 字节，濁音字（ガ パ ド…）分解后占 6 字节
   function showLength() {
     if (!outputText.value) {
       lengthHint.style.display = 'none';
       return;
     }
     const ext = fsSupported ? rawExt(fileSelect.value) : '';
-    const bytes = new TextEncoder().encode(outputText.value + ext).length;
+    const bytes = nameBytes(outputText.value + ext);
     const over = bytes - MAX_NAME_BYTES;
 
     lengthHint.className = 'hint' + (over > 0 ? ' is-over' : (bytes > MAX_NAME_BYTES - 40 ? ' is-warn' : ''));
     lengthHint.textContent = over > 0
       ? '文件名 ' + bytes + ' 字节，超出上限 ' + MAX_NAME_BYTES + ' 共 ' + over
-        + ' 字节，改名会被跳过——请把商品名改短约 ' + Math.ceil(over / 3) + ' 个日文字'
-      : '文件名 ' + bytes + ' / ' + MAX_NAME_BYTES + ' 字节，还可以再写约 '
-        + Math.floor(-over / 3) + ' 个日文字' + (ext ? '' : '（未含扩展名）');
+        + ' 字节，改名会被跳过——请把商品名改短'
+      : '文件名 ' + bytes + ' / ' + MAX_NAME_BYTES + ' 字节，还剩 ' + (-over)
+        + ' 字节（日文 1 字约 3 字节，濁音字如 ガ パ ド 算 6 字节）'
+        + (ext ? '' : '（未含扩展名）');
     lengthHint.style.display = 'block';
   }
 
@@ -689,6 +690,12 @@
 
   const IMG_EXTS = ['.jpg', '.jpeg', '.png', '.heic'];
   const MAX_NAME_BYTES = 255;
+
+  // macOS 按 NFD 存文件名：濁音假名会拆成「基字+濁点」两个码点，3 字节变 6 字节，
+  // 所以必须按分解后的长度算，否则会漏判（246 字节的名字实际占 270）
+  function nameBytes(name) {
+    return new TextEncoder().encode(name.normalize('NFD')).length;
+  }
   const renameFolder = document.getElementById('renameFolder');
   const renameResult = document.getElementById('renameResult');
   const renameBtn = document.getElementById('renameBtn');
@@ -851,13 +858,12 @@
       const neu = base + (itemExt || rawExt(old));
       if (neu === old) return { num, old, neu: '', state: 'skip', note: '文件名已经一样' };
 
-      // macOS / Linux 单个文件名上限 255 字节，日文一个字就占 3 字节
-      const bytes = new TextEncoder().encode(neu).length;
+      const bytes = nameBytes(neu);
       if (bytes > MAX_NAME_BYTES) {
         return {
           num, old, neu, state: 'skip',
           note: '文件名过长：' + bytes + ' 字节，上限 ' + MAX_NAME_BYTES
-            + '，需再短 ' + (bytes - MAX_NAME_BYTES) + ' 字节（日文 1 字 = 3 字节）'
+            + '，需再短 ' + (bytes - MAX_NAME_BYTES) + ' 字节'
         };
       }
 
