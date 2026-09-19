@@ -592,7 +592,7 @@
   filePreview.addEventListener('error', () => {
     if (!filePreview.dataset.name) return; // 清空 src 时也会触发 error，忽略
     filePreview.style.display = 'none';
-    previewNote.textContent = '这个格式浏览器无法预览（iPhone 拍的 HEIC 多半如此），但不影响改名。';
+    previewNote.textContent = '这个格式浏览器无法预览，但不影响改名。';
     previewNote.style.display = 'block';
   });
 
@@ -695,8 +695,27 @@
     return splitName(name)[0].replace(/^\[[^\]]*\]/, '');
   }
 
+  const HEIC_EXTS = ['.heic', '.heif'];
   let previewUrl = null;
   let previewToken = 0;
+  let heicLoader = null;
+
+  // 浏览器自己解不了 HEIC，需要时才去加载解码库（1.3MB，不用就不下载）
+  function loadHeicDecoder() {
+    if (!heicLoader) {
+      heicLoader = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'vendor/heic2any.min.js';
+        script.onload = () => resolve(window.heic2any);
+        script.onerror = () => {
+          heicLoader = null; // 允许下次重试
+          reject(new Error('解码库加载失败'));
+        };
+        document.head.appendChild(script);
+      });
+    }
+    return heicLoader;
+  }
 
   async function showPreview(name) {
     const token = ++previewToken;
@@ -711,9 +730,9 @@
     }
     if (!name || !dirHandle) return;
 
-    let file;
+    let blob;
     try {
-      file = await (await dirHandle.getFileHandle(name)).getFile();
+      blob = await (await dirHandle.getFileHandle(name)).getFile();
     } catch (e) {
       if (token !== previewToken) return;
       previewNote.textContent = '读取文件失败：' + (e.message || e);
@@ -722,7 +741,23 @@
     }
     if (token !== previewToken) return; // 期间又换了选择，丢弃这次结果
 
-    previewUrl = URL.createObjectURL(file);
+    if (HEIC_EXTS.includes(rawExt(name).toLowerCase())) {
+      previewNote.textContent = '正在解码 HEIC，大图可能要几秒…';
+      previewNote.style.display = 'block';
+      try {
+        const decode = await loadHeicDecoder();
+        const out = await decode({ blob, toType: 'image/jpeg', quality: 0.9 });
+        if (token !== previewToken) return;
+        blob = Array.isArray(out) ? out[0] : out;
+      } catch (e) {
+        if (token !== previewToken) return;
+        previewNote.textContent = 'HEIC 解码失败：' + (e.message || e) + '（不影响改名）';
+        return;
+      }
+      previewNote.style.display = 'none';
+    }
+
+    previewUrl = URL.createObjectURL(blob);
     filePreview.dataset.name = name;
     filePreview.src = previewUrl;
     filePreview.style.display = 'block';
