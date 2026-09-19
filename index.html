@@ -277,6 +277,16 @@
     margin: 0;
     align-self: center;
   }
+  .file-preview {
+    display: none;
+    max-width: 100%;
+    max-height: 320px;
+    margin-top: 12px;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    background: #f8f9fb;
+    object-fit: contain;
+  }
   .title-row {
     position: relative;
     display: flex;
@@ -377,6 +387,8 @@
     <input type="text" id="imgNumber" inputmode="numeric" pattern="[0-9]*" placeholder="数字（位数不限，例如 1234）">
   </div>
   <p class="hint" id="fileSelectHint">选中的文件名就是正文，已有的 [ ] 前缀和扩展名会自动去掉。</p>
+  <img id="filePreview" class="file-preview" alt="所选图片预览">
+  <p class="hint" id="previewNote" style="display:none;"></p>
 </div>
 
 <div class="card">
@@ -457,6 +469,8 @@
   const fileSelectHint = document.getElementById('fileSelectHint');
   const imgNumber = document.getElementById('imgNumber');
   const imgNumberGroup = document.getElementById('imgNumberGroup');
+  const filePreview = document.getElementById('filePreview');
+  const previewNote = document.getElementById('previewNote');
   const outputText = document.getElementById('outputText');
   const convertBtn = document.getElementById('convertBtn');
   const convertHint = document.getElementById('convertHint');
@@ -571,7 +585,15 @@
     fileSelectHint.textContent = fileSelect.value
       ? '正文将使用：' + bodyFromFile(fileSelect.value)
       : '选中的文件名就是正文，已有的 [ ] 前缀和扩展名会自动去掉。';
+    showPreview(fileSelect.value);
     updateState();
+  });
+
+  filePreview.addEventListener('error', () => {
+    if (!filePreview.dataset.name) return; // 清空 src 时也会触发 error，忽略
+    filePreview.style.display = 'none';
+    previewNote.textContent = '这个格式浏览器无法预览（iPhone 拍的 HEIC 多半如此），但不影响改名。';
+    previewNote.style.display = 'block';
   });
 
   imgNumber.addEventListener('input', () => {
@@ -671,6 +693,39 @@
   // 文件名 → 正文：去掉图片扩展名，再去掉已有的 [ ] 前缀，避免改名时前缀套前缀
   function bodyFromFile(name) {
     return splitName(name)[0].replace(/^\[[^\]]*\]/, '');
+  }
+
+  let previewUrl = null;
+  let previewToken = 0;
+
+  async function showPreview(name) {
+    const token = ++previewToken;
+
+    delete filePreview.dataset.name;
+    filePreview.removeAttribute('src');
+    filePreview.style.display = 'none';
+    previewNote.style.display = 'none';
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      previewUrl = null;
+    }
+    if (!name || !dirHandle) return;
+
+    let file;
+    try {
+      file = await (await dirHandle.getFileHandle(name)).getFile();
+    } catch (e) {
+      if (token !== previewToken) return;
+      previewNote.textContent = '读取文件失败：' + (e.message || e);
+      previewNote.style.display = 'block';
+      return;
+    }
+    if (token !== previewToken) return; // 期间又换了选择，丢弃这次结果
+
+    previewUrl = URL.createObjectURL(file);
+    filePreview.dataset.name = name;
+    filePreview.src = previewUrl;
+    filePreview.style.display = 'block';
   }
 
   function populateFileSelect() {
