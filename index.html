@@ -6,7 +6,7 @@
 <title>文本转换工具</title>
 <style>
   :root {
-    color-scheme: light dark;
+    color-scheme: light;
   }
   * { box-sizing: border-box; }
   body {
@@ -277,19 +277,50 @@
     margin: 0;
     align-self: center;
   }
-  footer {
-    text-align: left;
-    color: #777;
-    font-size: 0.9rem;
-    line-height: 1.6;
-    margin-top: 10px;
+  .title-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+  .title-row h1 {
+    margin: 0;
+  }
+  .help-btn {
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    min-height: 28px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1;
+    background: #fff;
+    color: #2563eb;
+    border: 1.5px solid #2563eb;
+  }
+  .help-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    z-index: 10;
+    width: 100%;
+    max-width: 520px;
     padding: 16px 18px;
     background: #fff;
     border-radius: 12px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+    color: #666;
+    font-size: 0.9rem;
+    line-height: 1.6;
   }
-  footer strong {
-    color: #333;
+  .help-popover strong {
+    color: #222;
+  }
+  .help-popover[hidden] {
+    display: none;
   }
   @media (max-width: 480px) {
     .row {
@@ -307,7 +338,17 @@
 </head>
 <body>
 
-<h1>文本转换工具</h1>
+<div class="title-row">
+  <h1>文本转换工具</h1>
+  <button id="helpBtn" class="help-btn" type="button" aria-expanded="false" aria-label="转换规则说明">?</button>
+  <div id="helpPopover" class="help-popover" role="dialog" aria-label="转换规则说明" hidden>
+    <p style="margin: 0 0 6px;"><strong>转换规则说明</strong></p>
+    <p style="margin: 0 0 4px;">正文取自第 2 步选中的文件名，会自动去掉扩展名和已有的「[ ]」前缀。</p>
+    <p style="margin: 0 0 4px;">在正文前面加上「[ ]」，里面放商品信息，格式为「商品名=金额」；金额留空时不加 = 符号，只显示商品名。</p>
+    <p style="margin: 0 0 4px;">填了多组商品名和金额，用「,」（半角逗号）把它们隔开。</p>
+    <p style="margin: 4px 0 0;">例如：[商品名=343424,商品名2]IMG_1234</p>
+  </div>
+</div>
 <p class="desc">选文件夹 → 选文件 → 填商品信息 → 转换 → 累积 → 一键改名。所有处理都在你的浏览器里完成，不会上传到任何服务器。</p>
 
 <div class="card">
@@ -400,14 +441,6 @@
   </div>
   <div id="renameResult"></div>
 </div>
-
-<footer>
-  <p style="margin: 0 0 6px;"><strong>转换规则说明</strong></p>
-  <p style="margin: 0 0 4px;">正文取自第 2 步选中的文件名，会自动去掉扩展名和已有的「[ ]」前缀。</p>
-  <p style="margin: 0 0 4px;">在正文前面加上「[ ]」，里面放商品信息，格式为「商品名=金额」；金额留空时不加 = 符号，只显示商品名。</p>
-  <p style="margin: 0 0 4px;">填了多组商品名和金额，用「,」（半角逗号）把它们隔开。</p>
-  <p style="margin: 4px 0 0;">例如：[商品名=343424,商品名2]IMG_1234</p>
-</footer>
 
 <script>
   const productRows = document.getElementById('productRows');
@@ -824,6 +857,29 @@
       populateFileSelect(); // 文件名变了，第 2 步的列表要跟着更新
     });
   }
+
+  // ---- 标题上的规则说明气泡 ----
+
+  const helpBtn = document.getElementById('helpBtn');
+  const helpPopover = document.getElementById('helpPopover');
+
+  function setHelpOpen(open) {
+    helpPopover.hidden = !open;
+    helpBtn.setAttribute('aria-expanded', String(open));
+  }
+
+  helpBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setHelpOpen(helpPopover.hidden);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!helpPopover.hidden && !helpPopover.contains(e.target)) setHelpOpen(false);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') setHelpOpen(false);
+  });
 
   renderHistory();
 </script>
