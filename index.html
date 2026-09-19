@@ -220,6 +220,43 @@
     color: #16a34a;
     visibility: hidden;
   }
+  .rename-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+    font-size: 0.9rem;
+  }
+  .rename-table th, .rename-table td {
+    border-bottom: 1px solid #eee;
+    padding: 8px 6px;
+    text-align: left;
+    vertical-align: top;
+    word-break: break-all;
+  }
+  .rename-table th {
+    color: #666;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .rename-table .num-col {
+    white-space: nowrap;
+    color: #666;
+  }
+  .name-old {
+    color: #888;
+    text-decoration: line-through;
+  }
+  .name-new {
+    color: #222;
+  }
+  .st-ok { color: #16a34a; white-space: nowrap; }
+  .st-skip { color: #b45309; }
+  .st-err { color: #dc2626; }
+  .rename-summary {
+    margin: 14px 0 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
   footer {
     text-align: left;
     color: #777;
@@ -319,6 +356,21 @@
   <p class="hint">复制后切到 Claude Cowork，粘贴进对话框回车即可执行改名。</p>
 </div>
 
+<div class="card">
+  <div class="card-head">
+    <span class="step-badge">6</span>
+    <h2>直接改名（不经过 Claude）</h2>
+    <span id="renameFolder" class="count-badge"></span>
+  </div>
+  <p class="hint" style="margin-top:0;">和第 5 步二选一。选中「メルカリ出品」文件夹后，按累积结果直接改名，规则与 rename-photos skill 一致：取末尾数字匹配，只改唯一命中的那一个。</p>
+  <p class="hint" id="renameUnsupported" style="display:none; color:#b45309;"></p>
+  <div class="row" id="renameActions">
+    <button id="pickFolderBtn" class="btn-outline" type="button">选择文件夹</button>
+    <button id="renameBtn" type="button" disabled>执行改名</button>
+  </div>
+  <div id="renameResult"></div>
+</div>
+
 <footer>
   <p style="margin: 0 0 6px;"><strong>转换规则说明</strong></p>
   <p style="margin: 0 0 4px;">正文固定为「IMG_」加数字，只需填数字部分，位数不限。</p>
@@ -357,8 +409,8 @@
     historyCount.textContent = resultHistory.length ? ('共 ' + resultHistory.length + ' 条') : '';
     skillCommand.value = resultHistory.length ? SKILL_NAME + ' ' + historyOutput.value : '';
     copySkillBtn.disabled = !resultHistory.length;
+    refreshPreview();
   }
-  renderHistory();
 
   async function copyText(text, hint) {
     if (!text) return;
@@ -493,6 +545,209 @@
     resultHistory = [];
     renderHistory();
   });
+
+  // ---- 直接改名（规则对齐 flea-market-rename-photos skill）----
+
+  const IMG_EXTS = ['.jpg', '.jpeg', '.png', '.heic'];
+  const renameFolder = document.getElementById('renameFolder');
+  const renameResult = document.getElementById('renameResult');
+  const renameBtn = document.getElementById('renameBtn');
+  const pickFolderBtn = document.getElementById('pickFolderBtn');
+
+  const fsSupported = typeof window.showDirectoryPicker === 'function'
+    && typeof FileSystemFileHandle !== 'undefined'
+    && 'move' in FileSystemFileHandle.prototype;
+
+  let dirHandle = null;
+  let dirFiles = [];
+
+  function rawExt(name) {
+    const dot = name.lastIndexOf('.');
+    return dot > 0 ? name.slice(dot) : '';
+  }
+
+  // 扩展名不在图片列表里时，整串都当作文件名主体（与 skill 的 sp() 一致）
+  function splitName(name) {
+    const ext = rawExt(name);
+    return ext && IMG_EXTS.includes(ext.toLowerCase())
+      ? [name.slice(0, name.length - ext.length), ext]
+      : [name, ''];
+  }
+
+  function tailDigits(s) {
+    const m = /(\d+)\s*$/.exec(s);
+    return m ? m[1] : null;
+  }
+
+  // 商品名里本身带半角逗号，所以只能按 "," 切，不能按裸逗号切
+  function parseItems(raw) {
+    raw = raw.trim();
+    if (!raw) return [];
+    const wrapped = raw.startsWith('{') && raw.endsWith('}')
+      ? '[' + raw.slice(1, -1) + ']'
+      : raw;
+    try {
+      const v = JSON.parse(wrapped);
+      if (Array.isArray(v) && v.every((x) => typeof x === 'string')) return v;
+    } catch (e) { /* 落到下面的正则 */ }
+    const quoted = [];
+    const re = /"((?:[^"\\]|\\.)*)"/g;
+    let m;
+    while ((m = re.exec(raw)) !== null) quoted.push(m[1]);
+    if (quoted.length) return quoted;
+    return raw.split('\n').map((l) => l.trim()).filter((l) => l);
+  }
+
+  function planRenames(items, fileNames) {
+    const files = fileNames.slice();
+    return items.map((item) => {
+      const [base, itemExt] = splitName(item);
+      const num = tailDigits(base);
+      if (!num) return { num: '-', old: '', neu: '', state: 'skip', note: '输入末尾没有数字' };
+
+      const hits = files.filter((f) => tailDigits(splitName(f)[0]) === num);
+      if (hits.length !== 1) {
+        return {
+          num, old: hits.join(' / '), neu: '', state: 'skip',
+          note: hits.length ? '匹配到 ' + hits.length + ' 个' : '没找到匹配文件'
+        };
+      }
+
+      const old = hits[0];
+      const neu = base + (itemExt || rawExt(old));
+      if (neu === old) return { num, old, neu: '', state: 'skip', note: '文件名已经一样' };
+      if (files.includes(neu)) return { num, old, neu, state: 'skip', note: '目标文件名已存在' };
+
+      files[files.indexOf(old)] = neu;
+      return { num, old, neu, state: 'ready' };
+    });
+  }
+
+  function renderRenameRows(rows, done) {
+    if (!rows.length) {
+      renameResult.innerHTML = '';
+      return;
+    }
+    const table = document.createElement('table');
+    table.className = 'rename-table';
+    table.innerHTML = '<thead><tr><th>末尾数字</th><th>文件名</th><th>结果</th></tr></thead>';
+    const tbody = document.createElement('tbody');
+
+    rows.forEach((r) => {
+      const tr = document.createElement('tr');
+
+      const tdNum = document.createElement('td');
+      tdNum.className = 'num-col';
+      tdNum.textContent = r.num;
+
+      const tdName = document.createElement('td');
+      if (r.old && r.neu) {
+        const oldEl = document.createElement('div');
+        oldEl.className = 'name-old';
+        oldEl.textContent = r.old;
+        const newEl = document.createElement('div');
+        newEl.className = 'name-new';
+        newEl.textContent = '→ ' + r.neu;
+        tdName.append(oldEl, newEl);
+      } else {
+        tdName.textContent = r.old || '（无）';
+      }
+
+      const tdState = document.createElement('td');
+      if (r.state === 'done') {
+        tdState.className = 'st-ok';
+        tdState.textContent = '✅ 已改名';
+      } else if (r.state === 'ready') {
+        tdState.className = 'st-ok';
+        tdState.textContent = '待改名';
+      } else if (r.state === 'error') {
+        tdState.className = 'st-err';
+        tdState.textContent = '⚠️ ' + r.note;
+      } else {
+        tdState.className = 'st-skip';
+        tdState.textContent = '⏭ ' + r.note;
+      }
+
+      tr.append(tdNum, tdName, tdState);
+      tbody.appendChild(tr);
+    });
+
+    table.appendChild(tbody);
+    renameResult.innerHTML = '';
+    renameResult.appendChild(table);
+
+    const okCount = rows.filter((r) => r.state === (done ? 'done' : 'ready')).length;
+    const summary = document.createElement('p');
+    summary.className = 'rename-summary';
+    summary.textContent = done
+      ? '成功 ' + okCount + ' 个、跳过 ' + (rows.length - okCount) + ' 个。'
+      : '将改名 ' + okCount + ' 个、跳过 ' + (rows.length - okCount) + ' 个。';
+    renameResult.appendChild(summary);
+  }
+
+  function refreshPreview() {
+    if (!fsSupported || !dirHandle) return;
+    const rows = planRenames(parseItems(historyOutput.value), dirFiles);
+    const readyCount = rows.filter((r) => r.state === 'ready').length;
+    renameBtn.disabled = !readyCount;
+    renameBtn.textContent = readyCount ? '执行改名（' + readyCount + ' 个）' : '执行改名';
+    renderRenameRows(rows, false);
+  }
+
+  async function readDirFiles() {
+    const names = [];
+    for await (const entry of dirHandle.values()) {
+      if (entry.kind === 'file' && !entry.name.startsWith('.')) names.push(entry.name);
+    }
+    return names;
+  }
+
+  if (!fsSupported) {
+    document.getElementById('renameActions').style.display = 'none';
+    const notice = document.getElementById('renameUnsupported');
+    notice.style.display = 'block';
+    notice.textContent = '这个浏览器不支持直接改名（iPhone / iPad 上所有浏览器都不支持）。'
+      + '请在 Mac 或 PC 上用 Chrome / Edge 打开本页，或者改用第 5 步把指令复制给 Claude。';
+  } else {
+    pickFolderBtn.addEventListener('click', async () => {
+      try {
+        dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+      } catch (e) {
+        return; // 用户取消
+      }
+      dirFiles = await readDirFiles();
+      renameFolder.textContent = dirHandle.name + '（' + dirFiles.length + ' 个文件）';
+      pickFolderBtn.textContent = '重新选择文件夹';
+      refreshPreview();
+    });
+
+    renameBtn.addEventListener('click', async () => {
+      renameBtn.disabled = true;
+      dirFiles = await readDirFiles(); // 以执行前的真实目录为准
+      const rows = planRenames(parseItems(historyOutput.value), dirFiles);
+
+      // 每改一个就刷新一次表格：万一中途失败，也能看清已经改到哪了
+      for (const row of rows) {
+        if (row.state !== 'ready') continue;
+        try {
+          const handle = await dirHandle.getFileHandle(row.old);
+          await handle.move(row.neu);
+          row.state = 'done';
+        } catch (e) {
+          row.state = 'error';
+          row.note = e.message || String(e);
+        }
+        renderRenameRows(rows, true);
+      }
+
+      dirFiles = await readDirFiles();
+      renameFolder.textContent = dirHandle.name + '（' + dirFiles.length + ' 个文件）';
+      renderRenameRows(rows, true);
+      renameBtn.textContent = '执行改名';
+    });
+  }
+
+  renderHistory();
 </script>
 
 </body>
