@@ -277,6 +277,8 @@
     margin: 0;
     align-self: center;
   }
+  .hint.is-warn { color: #b45309; }
+  .hint.is-over { color: #dc2626; font-weight: 600; }
   .file-preview {
     display: none;
     max-width: 100%;
@@ -411,6 +413,7 @@
     <h2 style="display:inline; margin:0;">转换结果</h2>
   </label>
   <textarea id="outputText" readonly placeholder="点击“转换”后，结果会显示在这里"></textarea>
+  <p class="hint" id="lengthHint" style="display:none;"></p>
   <div class="row">
     <button id="copyBtn" class="btn-outline" type="button">复制本次结果</button>
     <span id="copyHint">✓ 已复制</span>
@@ -472,6 +475,7 @@
   const filePreview = document.getElementById('filePreview');
   const previewNote = document.getElementById('previewNote');
   const outputText = document.getElementById('outputText');
+  const lengthHint = document.getElementById('lengthHint');
   const convertBtn = document.getElementById('convertBtn');
   const convertHint = document.getElementById('convertHint');
   const historyOutput = document.getElementById('historyOutput');
@@ -567,6 +571,25 @@
     return fsSupported ? bodyFromFile(fileSelect.value) : 'IMG_' + imgNumber.value;
   }
 
+  // 文件名按字节算，日文 1 字 = 3 字节，很容易在字符数看着不多时就超限
+  function showLength() {
+    if (!outputText.value) {
+      lengthHint.style.display = 'none';
+      return;
+    }
+    const ext = fsSupported ? rawExt(fileSelect.value) : '';
+    const bytes = new TextEncoder().encode(outputText.value + ext).length;
+    const over = bytes - MAX_NAME_BYTES;
+
+    lengthHint.className = 'hint' + (over > 0 ? ' is-over' : (bytes > MAX_NAME_BYTES - 40 ? ' is-warn' : ''));
+    lengthHint.textContent = over > 0
+      ? '文件名 ' + bytes + ' 字节，超出上限 ' + MAX_NAME_BYTES + ' 共 ' + over
+        + ' 字节，改名会被跳过——请把商品名改短约 ' + Math.ceil(over / 3) + ' 个日文字'
+      : '文件名 ' + bytes + ' / ' + MAX_NAME_BYTES + ' 字节，还可以再写约 '
+        + Math.floor(-over / 3) + ' 个日文字' + (ext ? '' : '（未含扩展名）');
+    lengthHint.style.display = 'block';
+  }
+
   function autoGrow(el) {
     el.style.height = 'auto';
     el.style.height = el.scrollHeight + 'px';
@@ -620,6 +643,7 @@
     const prefix = groups.length ? '[' + groups.join(',') + ']' : '';
     outputText.value = prefix + currentBody();
     flash(outputText);
+    showLength();
 
     resultHistory.push(outputText.value);
     renderHistory();
@@ -634,6 +658,7 @@
       imgNumber.value = '';
     }
     outputText.value = '';
+    lengthHint.style.display = 'none';
     productRows.innerHTML = '';
     addRow();
   });
