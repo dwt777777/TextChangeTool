@@ -252,7 +252,7 @@
   .st-ok { color: #16a34a; white-space: nowrap; }
   .st-skip { color: #b45309; }
   .st-err { color: #dc2626; }
-  button.list-btn {
+  button.list-btn, button.retry-btn {
     display: block;
     margin-top: 8px;
     padding: 6px 12px;
@@ -926,6 +926,39 @@
     return target;
   }
 
+  // 改名/存入清单失败后，刷新一下目录和下拉框——不管是不是这次操作改的，做一次总没坏处
+  async function afterFileChange() {
+    dirFiles = await readDirFiles();
+    renameFolder.textContent = dirHandle.name + '（' + dirFiles.length + ' 个文件）';
+    populateFileSelect();
+  }
+
+  async function attemptRename(row) {
+    try {
+      const handle = await dirHandle.getFileHandle(row.old);
+      await handle.move(row.neu);
+      row.state = 'done';
+      delete row.retryAction;
+    } catch (e) {
+      row.state = 'error';
+      row.note = e.message || String(e);
+      row.retryAction = 'rename';
+    }
+  }
+
+  async function attemptList(row) {
+    try {
+      const target = await moveToList(row);
+      row.state = 'listed';
+      row.neu = target;
+      delete row.retryAction;
+    } catch (e) {
+      row.state = 'error';
+      row.note = e.message || String(e);
+      row.retryAction = 'list';
+    }
+  }
+
   function makeListButton(row, rows, done) {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -934,17 +967,27 @@
     btn.addEventListener('click', async () => {
       btn.disabled = true;
       btn.textContent = '存入中…';
-      try {
-        const target = await moveToList(row);
-        row.state = 'listed';
-        row.neu = target;
-        dirFiles = await readDirFiles();
-        renameFolder.textContent = dirHandle.name + '（' + dirFiles.length + ' 个文件）';
-        populateFileSelect();
-      } catch (e) {
-        row.state = 'error';
-        row.note = e.message || String(e);
+      await attemptList(row);
+      await afterFileChange();
+      renderRenameRows(rows, done);
+    });
+    return btn;
+  }
+
+  function makeRetryButton(row, rows, done) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-warn retry-btn';
+    btn.textContent = row.retryAction === 'list' ? '重试存入清单' : '重试改名';
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = '重试中…';
+      if (row.retryAction === 'list') {
+        await attemptList(row);
+      } else {
+        await attemptRename(row);
       }
+      await afterFileChange();
       renderRenameRows(rows, done);
     });
     return btn;
@@ -990,6 +1033,7 @@
       } else if (r.state === 'error') {
         tdState.className = 'st-err';
         tdState.textContent = '⚠️ ' + r.note;
+        tdState.appendChild(makeRetryButton(r, rows, done));
       } else if (r.state === 'listed') {
         tdState.className = 'st-ok';
         tdState.textContent = '✅ 已存入清单';
@@ -1078,25 +1122,16 @@
       // 每改一个就刷新一次表格：万一中途失败，也能看清已经改到哪了
       for (const row of rows) {
         if (row.state !== 'ready') continue;
-        try {
-          const handle = await dirHandle.getFileHandle(row.old);
-          await handle.move(row.neu);
-          row.state = 'done';
-        } catch (e) {
-          row.state = 'error';
-          row.note = e.message || String(e);
-        }
+        await attemptRename(row);
         renderRenameRows(rows, true);
       }
 
-      dirFiles = await readDirFiles();
-      renameFolder.textContent = dirHandle.name + '（' + dirFiles.length + ' 个文件）';
+      await afterFileChange();
       renderRenameRows(rows, true);
       renameBtn.textContent = '执行改名';
 
       const okCount = rows.filter((r) => r.state === 'done').length;
       renameHint.textContent = '已改名 ' + okCount + ' 个，下拉列表已刷新';
-      populateFileSelect(); // 文件名变了，第 2 步的列表要跟着更新
     });
   }
 
