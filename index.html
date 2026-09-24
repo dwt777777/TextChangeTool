@@ -737,6 +737,8 @@
 
   const IMG_EXTS = ['.jpg', '.jpeg', '.png', '.heic'];
   const MAX_NAME_BYTES = 255;
+  // "/" 是路径分隔符，NUL 字节也一律非法；改名 API 遇到会直接抛错，不说明原因
+  const ILLEGAL_NAME_CHARS = /[/\0]/;
 
   // macOS 按 NFD 存文件名：濁音假名会拆成「基字+濁点」两个码点，3 字节变 6 字节，
   // 所以必须按分解后的长度算，否则会漏判（246 字节的名字实际占 270）
@@ -1005,6 +1007,15 @@
       const old = hits[0];
       const neu = base + (itemExt || rawExt(old));
       if (neu === old) return { num, old, neu: '', state: 'skip', note: '文件名已经一样' };
+
+      // "/" 是路径分隔符，浏览器的改名 API 会直接拒绝，报错里不会说明原因
+      const illegal = neu.match(ILLEGAL_NAME_CHARS);
+      if (illegal) {
+        return {
+          num, old, neu, state: 'skip', entry,
+          note: '商品名里有文件名不允许的符号「' + illegal[0] + '」，无法直接改名'
+        };
+      }
 
       const bytes = nameBytes(neu);
       if (bytes > MAX_NAME_BYTES) {
