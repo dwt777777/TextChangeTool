@@ -662,7 +662,7 @@
     flash(historyOutput);
   });
 
-  document.getElementById('clearBtn').addEventListener('click', () => {
+  function clearForm() {
     if (fsSupported) {
       fileSelect.selectedIndex = 0;
       fileSelect.dispatchEvent(new Event('change'));
@@ -673,7 +673,9 @@
     lengthHint.style.display = 'none';
     productRows.innerHTML = '';
     addRow();
-  });
+  }
+
+  document.getElementById('clearBtn').addEventListener('click', clearForm);
 
   document.getElementById('copyBtn').addEventListener('click', () => {
     copyText(outputText.value, document.getElementById('copyHint'));
@@ -695,6 +697,7 @@
   document.getElementById('historyClearBtn').addEventListener('click', () => {
     resultHistory = [];
     renderHistory();
+    clearForm();
   });
 
   // ---- 直接改名（规则对齐 flea-market-rename-photos skill）----
